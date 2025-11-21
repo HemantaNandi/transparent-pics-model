@@ -5,25 +5,52 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const loading = document.getElementById('loading');
 const downloadBtn = document.getElementById('download');
+const progressBar = document.getElementById('progress-bar');
+const timerDiv = document.getElementById('timer');
 
 // Function to remove the background
 async function removeBackground() {
     loading.style.display = 'block';
+    progressBar.style.width = '0%';
+    timerDiv.textContent = '';
+
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += 1;
+        progressBar.style.width = `${progress}%`;
+        if (progress >= 99) {
+            clearInterval(interval);
+        }
+    }, 50); // Simulate progress
+
+    const startTime = performance.now();
+
     // Load the BodyPix model
     const net = await bodyPix.load({
-        architecture: 'MobileNetV1',
+        architecture: 'ResNet50',
         outputStride: 16,
-        multiplier: 0.75,
         quantBytes: 2
     });
 
     // Create a segmentation mask
     const segmentation = await net.segmentMultiPerson(originalImage, {
         flipHorizontal: false,
-        internalResolution: 'medium',
+        internalResolution: 'high',
         segmentationThreshold: 0.7
     });
-    loading.style.display = 'none';
+
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    timerDiv.textContent = `Time taken: ${duration} seconds`;
+
+    clearInterval(interval);
+    progressBar.style.width = '100%';
+
+    // Hide loading after a short delay
+    setTimeout(() => {
+        loading.style.display = 'none';
+    }, 1000);
+
 
     // Create a new image data with a transparent background
     // Create a mask with the person opaque and the background transparent
@@ -43,6 +70,10 @@ async function removeBackground() {
 
     // Draw the original image
     ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+
+    // Apply a subtle blur for smoother edges
+    tempCtx.filter = 'blur(1px)';
+    tempCtx.drawImage(tempCanvas, 0, 0);
 
     // Use 'destination-in' to keep only the parts of the image that overlap with the mask
     ctx.globalCompositeOperation = 'destination-in';
